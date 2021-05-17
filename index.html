@@ -1,0 +1,440 @@
+<html>
+<head>
+  <title>Kraken Fees Calculator</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js" integrity="sha384-b/U6ypiBEHpOf/4+1nzFpr53nxSS+GLCkfwBdFNTxtclqqenISfwAzpKaMNFNmj4" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-h0AbiXch4ZDo7tp9hKZ4TsHbi047NrKGLO3SEJAg45jXxnGIfYzk4Si90RDIqNm1" crossorigin="anonymous"></script>
+  <!-- GTM -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-107719806-1"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'UA-107719806-1');
+  </script>
+  <!-- GA -->
+  <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-107719806-1', 'auto');
+  ga('send', 'pageview');
+  </script>
+
+  <style type="text/css">
+    hr {
+      margin: 40px 0;
+      border: 1px dotted #ccc;
+    }
+    #main-container {
+      width: 100%;
+      margin: auto;
+    }
+    #left-nav {
+      padding: 20px 0px;
+    }
+    #left-nav li {
+      list-style: none;
+    }
+    #caculator_form {
+      /*width: 800px;*/
+      margin: auto;
+      padding: 20px 40px;
+    }
+    tr.total {
+      background-color: #fafafa;
+    }
+    tr.total td {
+      font-weight: bold;
+    }
+    td.fee, td.number {
+      text-align: right;
+    }
+    tr.margin, tr.accumulation {
+      display: none;
+    }
+
+
+  </style>
+
+  <script type="text/javascript" src="build/kraken-fees-calculator.js"></script>
+
+  <script>
+
+  var KFC = KrakenFeesCalculator
+
+  function setKrakenConfiguration() {
+    return {
+      fees: {
+        maker: $('#form-trade-fees').val().split("/")[0],
+        taker: $('#form-trade-fees').val().split("/")[1]
+      },
+      trade: {
+        asset: $('#form-trade-asset').val(),
+        direction: $('#form-trade-direction').val(),
+        amount: $('#form-trade-amount').val(),
+        price_in: $('#form-trade-opening-price').val(),
+        type_in: $('#form-trade-opening-type').val(),
+        price_out: $('#form-trade-closing-price').val(),
+        type_out: $('#form-trade-closing-type').val(),
+        leverage: $('#form-trade-leverage').val(),
+        duration: $('#form-trade-leverage-duration').val()   
+      }
+    }
+  }
+
+  function updateDisplay(kraken_calculator) {
+    $('#value_in').text(kraken_calculator.result.value_in);
+    $('#value_out').text(kraken_calculator.result.value_out);
+    $('#opening_fees').text(kraken_calculator.fees.opening);
+    $('#closing_fees').text(kraken_calculator.fees.closing);
+    $('#margin_opening_fees').text(kraken_calculator.fees.margin_opening);
+    $('#margin_rollover_fees').text(kraken_calculator.fees.margin_rollover);
+    $('#closing_fees').text(kraken_calculator.fees.closing);
+    $('#total_fees').text(kraken_calculator.result.total_fees);
+    $('#gross_margin').text(kraken_calculator.result.profit);
+    $('#net_profit').text(kraken_calculator.result.net_profit);
+    $('#net_profit_percentage').text(kraken_calculator.result.net_profit_percentage+"%");
+    $('#accumulation').text(kraken_calculator.result.accumulation);
+    $('#accumulation_percentage').text(kraken_calculator.result.accumulation_percentage+"%");
+    if (kraken_calculator.config.trade.leverage > 1) {
+      $('tr.margin').show()
+    } else {
+      $('tr.margin').hide()
+    }
+    if (kraken_calculator.config.trade.direction == "short") {
+      $('tr.accumulation').show()
+    } else {
+      $('tr.accumulation').hide()
+    }
+  }
+
+
+  function saveConfig(config) {
+    var configToSave = JSON.stringify(config);
+    sessionStorage.setItem("savedConfig", configToSave);
+    updateSavedConfigMenu();
+  }
+
+  function saveConfigItem(item) {
+    var savedConfig = getSavedConfig();
+    savedConfig.items.push(item)
+    var configToSave = JSON.stringify(savedConfig);
+    sessionStorage.setItem("savedConfig", configToSave);
+    updateSavedConfigMenu();
+  }
+
+  function getSavedConfig() {
+    var savedConfigItems = sessionStorage.getItem("savedConfig");
+    return JSON.parse(savedConfigItems) || {items:[]};
+  }
+
+  function updateSavedConfigMenu() {
+    var savedConfig = getSavedConfig();
+    $( "ul#savedConfig li" ).remove();
+    $.each(savedConfig.items, function( index, value ) {
+      $("ul#savedConfig").append('<li class="list-group-item list-group-item-action"><a class="recall" href="#" data-config-id="' + index + '">' + getConfigLabel(value) + '</a> - <a href="#" class="delete text-danger" data-config-id="' + index + '"><small>delete</small></a></li>');
+    });
+  }
+
+  function getConfigLabel(config) {
+    var direction = (config.trade.direction === "long") ? "L" : "S";
+    var inType = (config.trade.type_in === "maker") ? "M" : "T";
+    var outType = (config.trade.type_out === "maker") ? "M" : "T";
+    if (config.trade.leverage > 1) {
+      var leverage = "L"+config.trade.leverage
+      var duration = "D"+(config.trade.duration || 1)
+    };
+    return [ direction, config.trade.amount, config.trade.asset.toUpperCase(), config.trade.price_in+inType, config.trade.price_out+outType, leverage, duration ].join(' ');
+  }
+
+  function recallSavedConfigItem(index) {
+    var config = getSavedConfigItem(index);
+    $('#form-trade-asset').val(config.trade.asset)
+    $('#form-trade-direction').val(config.trade.direction)
+    $('#form-trade-amount').val(config.trade.amount)
+    $('#form-trade-opening-price').val(config.trade.price_in)
+    $('#form-trade-opening-type').val(config.trade.type_in)
+    $('#form-trade-closing-price').val(config.trade.price_out)
+    $('#form-trade-closing-type').val(config.trade.type_out)
+    $('#form-trade-leverage').val(config.trade.leverage)
+    $('#form-trade-leverage-duration').val(config.trade.duration)
+    updateDisplay(new KFC(setKrakenConfiguration()));
+    $("#saveConfigBtn").attr('disabled', 'disabled');
+  }
+
+  function getSavedConfigItem(index) {
+    var config = getSavedConfig();
+    var item = config.items[index];
+    return item;    
+  }
+
+  function deleteSavedConfigItem(index) {
+    var config = getSavedConfig(); 
+    config.items.splice(index, 1);
+    saveConfig(config);
+  }
+
+
+
+  $(document).ready(function() {
+
+    // sessionStorage.removeItem("savedConfig");
+    updateSavedConfigMenu();
+
+    $("#saveConfigBtn").click(function() {
+      saveConfigItem(setKrakenConfiguration())
+    });
+
+    $("#savedConfig li a.recall").click(function() {
+      recallSavedConfigItem($(this).data("config-id"));
+    })
+
+    $("#savedConfig li a.delete").click(function() {
+      deleteSavedConfigItem($(this).data("config-id"));
+    })
+
+  });
+
+  // ^(\D)(\d*)(\D*)(\d*)>(\d*)(?:L(\d)D(\d*))?
+
+
+  (function() {
+
+    "use strict";
+    window.addEventListener("load", function() {
+      var form = document.getElementById("caculator_form");
+      $(form).on('keyup change', 'input, select, textarea', function(){
+        if (form.checkValidity() == false) {
+          event.preventDefault();
+          event.stopPropagation();
+          $("#saveConfigBtn").attr('disabled','disabled');
+        } else {
+          // let's update UI using kraken calculator returned object
+          updateDisplay(new KFC(setKrakenConfiguration()));
+          $("#saveConfigBtn").removeAttr('disabled');
+        }
+      });
+      form.addEventListener("keyup", function(event) {
+        form.classList.add("was-validated");
+      }, false);
+    }, false);
+  }());
+
+  </script>
+</head>
+
+<body>
+
+  <div id="main-container" class="container-fluid">
+    <div class="row">
+      <div class="col-3">
+
+        <nav id="left-nav" role="navigation">
+          <ul id="savedConfig" class="list-group">
+          </ul>
+          <button class="btn btn-primary btn-block" type="submit" id="saveConfigBtn" disabled>Save</button>
+        </nav>
+
+
+      </div>
+      <div class="col-9">
+
+        <form id="caculator_form" novalidate>
+          <h1>Kraken Fees Calculator</h1>
+          <p>
+            Estimate your next trade fees / profit on Kraken.<br />
+            When shorting, you can estimate your profit or your potential coin accumulation.
+          </p>
+
+          <fieldset>
+            <legend>Account</legend>
+            <div class="row">
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-fees">Fees</label>
+                  <select class="form-control" id="form-trade-fees">
+                    <option value="0.16/0.26" selected>0.16 / 0.26% (default)</option>
+                    <option value="0.14/0.24">0.14 / 0.24%</option>
+                    <option value="0.12/0.22">0.12 / 0.22%</option>
+                    <option value="0.10/0.20">0.10 / 0.20%</option>
+                    <option value="0.08/0.18">0.08 / 0.18%</option>
+                    <option value="0.06/0.16">0.06 / 0.16%</option>
+                    <option value="0.04/0.14">0.04 / 0.14%</option>
+                    <option value="0.02/0.12">0.02 / 0.12%</option>
+                    <option value="0.00/0.10">0.00 / 0.10%</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-asset">Asset</label>
+                  <select class="form-control" id="form-trade-asset">
+                    <option value="btc" selected>BTC</option>
+                    <option value="other">Other (ETH, ETC...)</option>
+                  </select>
+                </div>
+            </div>
+          </fieldset>
+
+          <hr>
+
+          <fieldset>
+            <legend>Trade</legend>
+            <div class="row">
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-direction">Direction</label>
+                  <select class="form-control" id="form-trade-direction">
+                    <option value="long" selected>Long</option>
+                    <option value="short">Short</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-amount">Amount</label>
+                  <input id="form-trade-amount" type="number" min="0" step="0.0000001" class="form-control" placeholder="" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-opening-price">Opening Price</label>
+                  <input id="form-trade-opening-price" type="number" min="0" step="0.0000001" class="form-control" placeholder="" required>
+                </div>
+              </div>
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-opening-type">Order type</label>
+                  <select class="form-control" id="form-trade-opening-type">
+                    <option value="maker" selected>Maker</option>
+                    <option value="taker">Taker</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-closing-price">Closing Price</label>
+                  <input id="form-trade-closing-price" type="number" min="0" step="0.0000001" class="form-control" placeholder="" required>
+                </div>
+              </div>
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-closing-type">Order type</label>
+                  <select class="form-control" id="form-trade-closing-type">
+                    <option value="maker" selected>Maker</option>
+                    <option value="taker">Taker</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          <hr>
+
+          <fieldset>
+            <legend>Margin Trading</legend>
+            <div class="row">
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-leverage">Leverage</label>
+                  <select class="form-control" id="form-trade-leverage">
+                    <option value="1" selected>No Leverage</option>
+                    <option value="2">Leverage 2:1</option>
+                    <option value="3">Leverage 3:1</option>
+                    <option value="4">Leverage 4:1</option>
+                    <option value="5">Leverage 5:1</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col">
+                <div class="form-group">
+                  <label for="form-trade-leverage-duration">Duration (hours)</label>
+                  <input id="form-trade-leverage-duration" type="number" class="form-control" placeholder="">
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          <hr>
+
+          <table class="table">
+            <tbody>
+              <tr>
+                <td>Opening value</td>
+                <td class="number" id="value_in"></td>
+              </tr>
+              <tr>
+                <td>Closing value</td>
+                <td class="number" id="value_out"></td>
+              </tr>
+              <tr class="total">
+                <td>Gross Margin</td>
+                <td class="number" id="gross_margin"></td>
+              </tr>
+              <tr>
+                <td>Opening fees</td>
+                <td class="number fee" id="opening_fees"></td>
+              </tr>
+              <tr class="margin">
+                <td>Margin opening fees</td>
+                <td class="number fee margin" id="margin_opening_fees"></td>
+              </tr>
+              <tr>
+                <td>Closing fees</td>
+                <td class="number fee" id="closing_fees"></td>
+              </tr>
+
+              <tr class="margin">
+                <td>Margin rollover fees</td>
+                <td class="number fee" id="margin_rollover_fees"></td>
+              </tr>
+              <tr class="total">
+                <td>Total Fees</td>
+                <td class="number" id="total_fees"></td>
+              </tr>
+              <tr class="total">
+                <td>Profit</td>
+                <td class="number"></td>
+              </tr>
+              <tr>
+                <td>Net Profit</td>
+                <td class="number" id="net_profit"></td>
+              </tr>
+              <tr>
+                <td>Net profit %</td>
+                <td class="number" id="net_profit_percentage"></td>
+              </tr>
+              <tr class="total accumulation">
+                <td>Accumulation</td>
+                <td class="number"></td>
+              </tr>
+              <tr class="accumulation">
+                <td>Coin buyable</td>
+                <td class="number" id="accumulation"></td>
+              </tr>
+              <tr class="accumulation">
+                <td>Coin accumulation %</td>
+                <td class="number" id="accumulation_percentage"></td>
+              </tr>
+            </tbody>
+          </table>
+
+        </form>
+
+
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
